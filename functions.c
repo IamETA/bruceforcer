@@ -20,7 +20,7 @@ void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
   
   //fill buffer until we have a line
   char chard = fgetc(fp);
-  int words = 0;
+  int words = (*count);
   int wordsize = 0;
   //*dictionary = malloc(sizeof(char*)); 
   while (chard != EOF)
@@ -28,11 +28,11 @@ void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
     //Add to buffer;
     if (chard == '\n') {
       //null terminate buffer
-      buffer[wordsize-1] = '\0';
+      buffer[wordsize] = '\0';
       //realoc size of dictionary
       *dictionary = realloc(*dictionary,sizeof(char*) * (words+1));
       (*dictionary)[words++] = malloc(wordsize+1);
-      const char *result = strncpy((*dictionary)[words-1],buffer,wordsize);
+      strncpy((*dictionary)[words-1],buffer,wordsize+1);
       //if (words % 50 == 0)      
       //printf("%s\n",(*dictionary)[words-1]);//debug
       //reset wordsize
@@ -71,9 +71,11 @@ void getfiles(char ***files, int *count, const char *directory)
     DIR *dpdf;
     struct dirent *epdf;
     dpdf = opendir(directory);
-    if (dpdf == NULL)
-        exit(EXIT_FAILURE);
+    if (dpdf == NULL) {
+      printf("Dictionaries folder not found: %s\n",directory);
+        return;
 
+    }
     //Folder has files, enumerate
     int fileCount = 0;
     while ((epdf = readdir(dpdf)))

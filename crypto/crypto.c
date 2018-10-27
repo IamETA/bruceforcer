@@ -14,12 +14,4 @@ char * makecrypt(passwd)
 	char* encrypted=crypt(passwd,salt);
 	return encrypted;
 }
-char * makecrypt(passwd,salt) {
-	return crypt(passwd,salt);
-}
-
-
-
-
-
 

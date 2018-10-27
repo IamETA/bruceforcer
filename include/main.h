@@ -1,5 +1,5 @@
 
 #ifndef MAIN_H_ /* Include guard */
 #define MAIN_H_
-void bf_dictionary(char*** dictionary,char* passwd, char* salt);
+char* bf_dictionary(char ***dictionary, int count, char *p_type_salt, const char *hashedvalue);
 #endif // MAIN_H_
