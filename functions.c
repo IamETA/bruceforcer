@@ -1,11 +1,45 @@
+
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <dirent.h>
 #include <string.h>
 #include "include/functions.h"
+#include <crypt.h>
 
 extern char *strdup(const char *src);
+
+//Bruceforce operations
+
+char *bf_dictionary(char ***dictionary, int startfrom, int count, char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
+{	
+	// Crypto Init
+	struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
+	//struct crypt_data cdata;
+  cdata->initialized = 0;
+  char *testpwd;
+  
+  for (int i = startfrom; i < startfrom + count; i++)
+  {
+    if (*abort == true) break;
+     testpwd = crypt_r((*dictionary)[i], p_type_salt,cdata);
+    *p_status = ((float)(i-startfrom) / count) * 100;
+
+#ifdef DEBUG
+    printf("testing word:%s -> %s against %s\n", (*dictionary)[i], testpwd, hashedvalue);
+#endif
+
+    if (strcmp(testpwd, hashedvalue) == 0)
+    {
+      free(testpwd);
+      return ((*dictionary)[i]);
+    }
+  }
+  free(testpwd);
+  return '\0';
+}
+
 //Dictionary
 void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
 {
@@ -33,9 +67,6 @@ void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
       *dictionary = realloc(*dictionary,sizeof(char*) * (words+1));
       (*dictionary)[words++] = malloc(wordsize+1);
       strncpy((*dictionary)[words-1],buffer,wordsize+1);
-      //if (words % 50 == 0)      
-      //printf("%s\n",(*dictionary)[words-1]);//debug
-      //reset wordsize
       wordsize = 0;
     }
     else {
@@ -46,9 +77,7 @@ void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
     chard = fgetc(fp);
   }
   (*count) = words;
-  //free up buffer
   free(buffer);
-  //dictionary[(int)filesize] = '\0';
   fclose(fp);
 }
 

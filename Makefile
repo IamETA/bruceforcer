@@ -13,7 +13,7 @@ OBJDIR = obj
 TARGET = bruceforce
 
 $(TARGET): main.o functions.o
-	$(CC) $(CFLAGS) $(RFLAGS) -o $(TARGET) main.o functions.o -lm -lcrypt
+	$(CC) $(CFLAGS) $(RFLAGS) -o $(TARGET) main.o functions.o -lm -lcrypt -pthread
 
 main.o: main.c
 	$(CC) $(CFLAGS) -c -o main.o main.c
