@@ -1,77 +1,186 @@
-
+//
 #define _GNU_SOURCE
+
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <dirent.h>
 #include <string.h>
-#include "include/functions.h"
 #include <crypt.h>
+#include "include/functions.h"
 
 extern char *strdup(const char *src);
 
 //Bruceforce operations
-
+void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count);
+char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash, char* password);
 char *bf_dictionary(char ***dictionary, int startfrom, int count, char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
-{	
-	// Crypto Init
-	struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
-	//struct crypt_data cdata;
+{
+  // Crypto Init
+  struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
+  //struct crypt_data cdata;
   cdata->initialized = 0;
-  char *testpwd;
-  
   for (int i = startfrom; i < startfrom + count; i++)
   {
-    if (*abort == true) break;
-     testpwd = crypt_r((*dictionary)[i], p_type_salt,cdata);
-    *p_status = ((float)(i-startfrom) / count) * 100;
-
-#ifdef DEBUG
-    printf("testing word:%s -> %s against %s\n", (*dictionary)[i], testpwd, hashedvalue);
-#endif
-
-    if (strcmp(testpwd, hashedvalue) == 0)
-    {
-      free(testpwd);
-      return ((*dictionary)[i]);
+    if (*abort == true)
+      break;
+    
+    if (password_for_hash(cdata,p_type_salt,hashedvalue,(*dictionary)[i]) != NULL) {
+      return (*dictionary)[i];
     }
+    *p_status = ((float)(i - startfrom) / count) * 100;
   }
-  free(testpwd);
   return '\0';
 }
 
-//Dictionary
-void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
+/* 
+  Check password to hash function to see if the
+  hashed result is equal to the input of <hash>
+
+  returns NULL if the result does not match the hash
+    or POINTER to the maching password if it
+    successfully matches the input string.
+
+  Improvements: We can probably optimize the string compare 
+  function to increase the speed
+*/
+char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash,char* password) {
+  printf("%s ", password);
+  char* hashcompare = crypt_r(password,salt,cdata);
+  if (strcmp(hashcompare,hash) == 0) {
+    return password;
+  }
+  else {
+    return NULL;
+  }
+}
+/* This is the function that will enumerate all
+  possible characters in a given c_tablesize.
+  Like smoking out hiding places, no characters can hide
+  from this function :)
+
+  This was the hardest function to make, and theres plenty of 
+  optimizations to make
+*/
+char* bytesmoker(bruteforce_args *bargs,char* sz_word, int wordsize,int workingposition,struct crypt_data *cdata) {
+  for (int i = 0;i<bargs->c_tablesize;i++) {
+    // feedback , for best optimization, remove this (if run with no output fex)
+    if (workingposition == 1) bargs->p_status = ((float)((float)i/(float)bargs->c_tablesize))*100;
+
+    //Go deeper if possible
+    if (workingposition < wordsize) {
+      printf("wordsize:%i",wordsize);
+      char* password = bytesmoker(bargs,sz_word,wordsize,workingposition+1,cdata);
+      if (password != NULL) return password;
+    }
+
+    //Change the character
+    sz_word[workingposition] = bargs->c_table[i];
+
+    //Test the password
+    bargs->p_processed++; //Show number of processed words
+    if (password_for_hash(cdata,bargs->salt,bargs->hash,sz_word) != NULL) 
+      return sz_word;
+  }
+
+  return NULL;
+}
+
+
+char *bf_hack(bruteforce_args *args)
 {
+  // Crypto Init
+  char *return_password;
+  struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
+  //struct crypt_data cdata;
+  cdata->initialized = 0;
+  //double totaltrips = c_tablesize*count * 10;
+  //printf("totaltrip:%i\n",totaltrips);
+  //int currenttrip = 0;
+  //Start with the first c_table
+  char *sz_word = malloc(sizeof(char*)); //Allocate buffer
+  for (int segment = args->segment_from;segment<args->segment_from + args->segment_count;segment++) {
+    //"statically" assign first bit with segment (each thread will have different segments)
+    sz_word[0] = args->c_table[segment]; //As multithread, we only process a segment of the total c_tablesize
+    for (int wordsize=1;wordsize<args->wordsize;wordsize++) {
+      if (args->stop) {
+        //REMEMBER TO FREE MEMORY here
+        return NULL;
+      }
+      sz_word = realloc(sz_word,sizeof(char*) * wordsize);
+      //sz_word[wordsize]=args->c_table[0];
+      sz_word[wordsize+1]='\0';
+      //Process each column
+      int charpos = 1;
+      return_password = bytesmoker(args, sz_word, wordsize, charpos, cdata);
+      
+      //Remember to free up memory if needed here
+      if(return_password!=NULL) return return_password;
+    }
+    args->activesegment = segment - args->segment_from;
+    args->p_status = ((float)(segment - args->segment_from) / args->segment_count) * 100;
+  }
+  return NULL;
+}
+//Dictionary
+void load_dictionary(const char *dictionarypath, char ***dictionary, int *count, int *dictfilecount)
+{
+  (*dictfilecount) = 0;
+  DIR *dpdf;
+  struct dirent *epdf;
+  dpdf = opendir(dictionarypath);
+  if (dpdf == NULL)
+  {
+    printf("Dictionaries folder not found: %s\n", dictionarypath);
+    return;
+  }
+  while ((epdf = readdir(dpdf)))
+  {
+    if (epdf->d_name[0] != '.') {
+      char *dictionaryfilepath = concat(dictionarypath, epdf->d_name);
+      load_dictionary_item(dictionaryfilepath, dictionary, count);
+      (*dictfilecount)++;
+      free(dictionaryfilepath);
+    }
+  }
+  closedir(dpdf);
+}
+
+void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count)
+{
+
   FILE *fp = fopen(dictionaryfile, "r");
   //size_t len = 0;
-  char * buffer = malloc(sizeof(char)*30);
-  
+  char *buffer = malloc(sizeof(char) * 30);
+
   if (fp == NULL)
     exit(EXIT_FAILURE);
 
   int position = 0;
-  
+
   //fill buffer until we have a line
   char chard = fgetc(fp);
   int words = (*count);
   int wordsize = 0;
-  //*dictionary = malloc(sizeof(char*)); 
+  //*dictionary = malloc(sizeof(char*));
   while (chard != EOF)
   {
     //Add to buffer;
-    if (chard == '\n') {
+    if (chard == '\n')
+    {
       //null terminate buffer
       buffer[wordsize] = '\0';
       //realoc size of dictionary
-      *dictionary = realloc(*dictionary,sizeof(char*) * (words+1));
-      (*dictionary)[words++] = malloc(wordsize+1);
-      strncpy((*dictionary)[words-1],buffer,wordsize+1);
+      *dictionary = realloc(*dictionary, sizeof(char *) * (words + 1));
+      (*dictionary)[words++] = malloc(wordsize + 1);
+      strncpy((*dictionary)[words - 1], buffer, wordsize + 1);
       wordsize = 0;
     }
-    else {
+    else
+    {
       buffer[wordsize] = chard;
-      wordsize ++;
+      wordsize++;
     }
     position++;
     chard = fgetc(fp);
@@ -81,60 +190,13 @@ void load_dictionary(const char *dictionaryfile, char*** dictionary, int* count)
   fclose(fp);
 }
 
-
-//File operations
-int getfilesize(const char *filename)
-{
-    FILE *fp = fopen(filename, "r");
-    if (fp == NULL)
-        exit(EXIT_FAILURE);
-    fseek(fp, 0, SEEK_END); // seek to end of file
-    int size = ftell(fp);   // get current file pointer
-    fclose(fp);
-    return size;
-}
-
-//Get files in directory
-void getfiles(char ***files, int *count, const char *directory)
-{
-    DIR *dpdf;
-    struct dirent *epdf;
-    dpdf = opendir(directory);
-    if (dpdf == NULL) {
-      printf("Dictionaries folder not found: %s\n",directory);
-        return;
-
-    }
-    //Folder has files, enumerate
-    int fileCount = 0;
-    while ((epdf = readdir(dpdf)))
-    {
-        //Dropping two bytes in 2 blocks somewhere in this code, don't know where.
-        char *directoryName = malloc(strlen(epdf->d_name) + 1); //= epdf->d_name; //tried pointing to this, but that didnt work well
-        strcpy(directoryName, epdf->d_name);
-        if ((directoryName[0] != '.'))
-        {
-            *files = realloc(*files, sizeof(char *) * (fileCount + 1)); //again, +1 for nullterminator
-            (*files)[fileCount++] = directoryName;
-            printf("Found: %s\n", (*files)[fileCount - 1]);
-        }
-        else
-        {
-            //Free the unwanted directories
-            free(directoryName);
-        }
-    }
-    (*count) = fileCount;
-    closedir(dpdf);
-}
-
 //String operations
 //Combine strings, in a somewhat sloppy way, but hey
 char *concat(const char *s1, const char *s2)
 {
-    size_t stringsize = strlen(s1) + strlen(s2) + 1;
-    char *result = malloc(stringsize); // +1 for the null-terminator
-    strcpy(result, s1);
-    strcat(result, s2);
-    return result;
+  size_t stringsize = strlen(s1) + strlen(s2) + 1;
+  char *result = malloc(stringsize); // +1 for the null-terminator
+  strcpy(result, s1);
+  strcat(result, s2);
+  return result;
 }
