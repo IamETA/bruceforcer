@@ -1,5 +1,7 @@
 #ifndef FUNCTIONS_H_ /* Include guard */
 #define FUNCTIONS_H_
+//Declerations
+#define ALPHABET "abcdefghikjlmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
 //Bruceforce operations
 typedef struct dict_args
 {
