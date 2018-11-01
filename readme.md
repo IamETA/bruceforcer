@@ -1,11 +1,11 @@
-#Bruceforcer 1.0
+# Bruceforcer 1.0
   By Erik Alvarez / aka Qdo
 
-#Setup
+# Setup
  * Clone repository
  * make
 
-#Run
+# Run
  ./bruceforcer -h '<hash with salt>'
 
 #optional parameters
