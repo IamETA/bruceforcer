@@ -6,21 +6,21 @@ typedef struct dict_args
   int id;
   int segment_count;
   char ***dictionary;
-  char *salt;
+  const char *salt;
   const char *hash;
   int segment_from;
   float p_status;
-  char * password;
+  const char * password;
   bool stop;
 } dict_args;
 
 typedef struct bruteforce_args
 {
   int id;
-  char *c_table;
+  const char *c_table;
   int c_tablesize;
   int wordsize;
-  char *salt;
+  const char *salt;
   const char *hash;
   int segment_from;
   int segment_count;
@@ -31,7 +31,7 @@ typedef struct bruteforce_args
   int activesegment;
 } bruteforce_args;
 
-char* bf_dictionary(char ***dictionary,int segment_from, int segment_count, char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort);
+const char* bf_dictionary(char ***dictionary,int segment_from, int segment_count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort);
 char *bf_hack(bruteforce_args *args);
 void load_dictionary(const char *dictionaryfile, char ***dictionary,int *segment_count,int *dictfilecount);
 //File operations

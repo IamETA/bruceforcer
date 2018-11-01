@@ -15,7 +15,7 @@ extern char *strdup(const char *src);
 //Bruceforce operations
 void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count);
 char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash, char* password);
-char *bf_dictionary(char ***dictionary, int startfrom, int count, char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
+const char *bf_dictionary(char ***dictionary, int startfrom, int count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
 {
   // Crypto Init
   struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
@@ -46,7 +46,7 @@ char *bf_dictionary(char ***dictionary, int startfrom, int count, char *p_type_s
   function to increase the speed
 */
 char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash,char* password) {
-  printf("%s ", password);
+  //printf("%s ", password);
   char* hashcompare = crypt_r(password,salt,cdata);
   if (strcmp(hashcompare,hash) == 0) {
     return password;
@@ -65,12 +65,13 @@ char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *h
 */
 char* bytesmoker(bruteforce_args *bargs,char* sz_word, int wordsize,int workingposition,struct crypt_data *cdata) {
   for (int i = 0;i<bargs->c_tablesize;i++) {
+    if (bargs->stop) return NULL;
     // feedback , for best optimization, remove this (if run with no output fex)
     if (workingposition == 1) bargs->p_status = ((float)((float)i/(float)bargs->c_tablesize))*100;
 
     //Go deeper if possible
     if (workingposition < wordsize) {
-      printf("wordsize:%i",wordsize);
+      //printf("wordsize:%i",wordsize);
       char* password = bytesmoker(bargs,sz_word,wordsize,workingposition+1,cdata);
       if (password != NULL) return password;
     }
@@ -93,14 +94,11 @@ char *bf_hack(bruteforce_args *args)
   // Crypto Init
   char *return_password;
   struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
-  //struct crypt_data cdata;
   cdata->initialized = 0;
-  //double totaltrips = c_tablesize*count * 10;
-  //printf("totaltrip:%i\n",totaltrips);
-  //int currenttrip = 0;
-  //Start with the first c_table
+  
   char *sz_word = malloc(sizeof(char*)); //Allocate buffer
   for (int segment = args->segment_from;segment<args->segment_from + args->segment_count;segment++) {
+    //Start with the first character in c_table
     //"statically" assign first bit with segment (each thread will have different segments)
     sz_word[0] = args->c_table[segment]; //As multithread, we only process a segment of the total c_tablesize
     for (int wordsize=1;wordsize<args->wordsize;wordsize++) {
