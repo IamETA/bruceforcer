@@ -11,17 +11,32 @@
 #include "include/crypto.h"
 #include "include/functions.h"
 
+//Defaults
 #define DEFAULT_DICTIONARY_PATH "./dictionaries/" //we'll only use this once
 #define ALPHABET "abcdefghikjlmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
 #define HASH_SALT_SIZE 11
 
+//Private methods
 void* bruteforceThreadCallback(void *args);
 void* dictionaryThreadCallback(void *args);
 void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, int THREADS);
 void bruceforce_bruteforce(const char* hash,const char *salt, int size, int THREADS);
 
+void printhelp() {
+  printf("Syntax: bruceforce -h '<hash>' -d '<optional dictionarypath>' -t <number of threads> -b <size of bytes>\n");
+  printf("Extra flags: `-s` to skip directory check.\n\n");
+}
+void printlogo() {
+  printf("********************************** \n");
+  printf("***        Bruce forcer        *** \n");
+  printf("***   Written by Erik Alvarez  *** \n");
+  printf("***         01.11.2018         *** \n");
+  printf("********************************** \n");
+}
 int main(int argc, char *argv[])
 {
+  printlogo();
+
   int byteSize = 4;
   int threadCount = 4;
   int skipdictionary = 0;
@@ -52,9 +67,14 @@ int main(int argc, char *argv[])
         byteSize = atoi(argv[optind]);
         break;
       default:
-        printf("Syntax: bruceforce -h '<hash>' -d '<optional dictionarypath>' -t <number of threads> -b <size of bytes>\n");
+        printhelp();
         exit(EXIT_FAILURE);
       }
+
+  if (c==-1) {
+    printhelp();
+    exit(EXIT_FAILURE);
+  }
   printf("\n");
 /*
   for (int index = optind; index < argc; index++)
@@ -209,6 +229,7 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     }
   }
 }
+
 void* bruteforceThreadCallback(void* args) {
   bruteforce_args *context = args;
   printf("thread-id: %i, thread-start-from: %i, count: %i,bitsize: %i\n",context->id,context->segment_from,context->segment_count,context->c_tablesize);
@@ -225,6 +246,8 @@ void* bruteforceThreadCallback(void* args) {
   printf("\n");
   pthread_exit(NULL);
 }
+
+
 void* dictionaryThreadCallback(void *args)
 {
   dict_args *context = args;

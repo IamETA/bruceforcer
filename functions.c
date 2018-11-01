@@ -10,8 +10,6 @@
 #include <crypt.h>
 #include "include/functions.h"
 
-extern char *strdup(const char *src);
-
 //Bruceforce operations
 void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count);
 char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash, char* password);
