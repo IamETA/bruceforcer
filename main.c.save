@@ -12,7 +12,7 @@
 #include "include/functions.h"
 
 #define DEFAULT_DICTIONARY_PATH "./dictionaries/" //we'll only use this once
-#define ALPHABET "abcdefghikjlmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
+#define ALPHABET "abcdefghikjlmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXY Z1234567890+\\\"#&/()=?!@$|[]|{}"
 #define HASH_SALT_SIZE 11
 
 void* bruteforceThreadCallback(void *args);
@@ -22,53 +22,49 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size, int THRE
 
 int main(int argc, char *argv[])
 {
-  int byteSize = 4;
-  int threadCount = 4;
-  int skipdictionary = 0;
-  const char *hash;
-  const char *dictpath = DEFAULT_DICTIONARY_PATH;
-  int c;
-  while ((c = getopt (argc, argv, "htdsb")) != -1)
+  printf("WTF\n");
+  sleep(1);
+  int MAX_BF_SIZE = 2;
+  int SET_THREADS = 2;
+
+printf("Processing arguments");
+int c;
+  while ((c = getopt (argc, argv, "hts")) != -1)
     switch (c)
       {
       case 't':
-	      printf("set-threads:%s ",argv[optind]);
-        threadCount = atoi(argv[optind]);
+	printf("opt:%s\n",optopt);
+        //SET_THREADS = atoi(optarg);
         break;
-      case 'h':
-        printf("set-hash:%s ",argv[optind]);
-        hash = argv[optind];
-        break; 
-      case 'd':
-        printf("set-directory:%s ", argv[optind]);
-        dictpath = argv[optind];
-        break;
-      case 's':
-        printf("skip-dictionary ");
-        skipdictionary = 1;
-        break;
-      case 'b':
-        printf("set-max-bytes: %s ",argv[optind]);
-        byteSize = atoi(argv[optind]);
-        break;
+	case 'h':
+	  printf("%s\n",optopt);
+	 break; 
       default:
-        printf("Syntax: bruceforce -h '<hash>' -d '<optional dictionarypath>' -t <number of threads> -b <size of bytes>\n");
+        printf("Syntax: bruceforce <hash> <optional dictionarypath>\n");
         exit(EXIT_FAILURE);
       }
-  printf("\n");
-/*
+
+  printf ("cvalue = %i\n",SET_THREADS);
+
   for (int index = optind; index < argc; index++)
     printf ("Non-option argument %s\n", argv[index]);
-*/
+
+  printf("Next:");
+  const char *hash = argv[1];
+  const char *dictpath = DEFAULT_DICTIONARY_PATH;
 
   //Exctract type and salt from hash
   char *salt = malloc(HASH_SALT_SIZE+1);
   salt[HASH_SALT_SIZE] = '\0';
+
   strncpy(salt, hash, HASH_SALT_SIZE);
-  printf("hash: %s, salt: %s, threads:%i, max-byte-size: %i\n", hash, salt,threadCount,byteSize);
-  if (skipdictionary==0)
-    bruceforce_dictionary(dictpath,hash,salt,threadCount);
-  bruceforce_bruteforce(hash,salt,byteSize,threadCount);
+  if (argc > 2)
+  {
+    dictpath = argv[2];
+  }
+  printf("hash: %s, salt: %s, threads:%i, max-byte-size: %i\n", hash, salt,SET_THREADS,MAX_BF_SIZE);
+  bruceforce_dictionary(dictpath,hash,salt,SET_THREADS);
+  bruceforce_bruteforce(hash,salt,MAX_BF_SIZE,SET_THREADS);
 
   printf("Complete\n.");
   free(salt);
@@ -108,7 +104,7 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
   printf("dictionary-word-count=%d, total-files=%d\n", words, dictfilecount);
   //create thread arguments and start threads
   dict_args **threadargs = dictcreate_threadargs(THREADS,salt,hash,words,&dictionary);
-  pthread_t threads[THREADS-1];
+  pthread_t threads[THREADS+1];
   for (int i = 0; i < THREADS; i++)
   {
     printf("Starting thread-id=%i, start-from=%i, count=%i\n",i,threadargs[i]->segment_from,threadargs[i]->segment_count);
@@ -182,17 +178,12 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
   //Wait until complete but show progress
   bool thread_continue = true;
   while (thread_continue) {
-    sleep(1);
-    bool all_threads_dead = true;
+    sleep(3);
     for (int i=0;i<THREADS;i++) {
-      all_threads_dead = all_threads_dead & targs[i].stop; //if any thread is dead
-      if (targs[i].stop == false) //Print only threads that is running
-        printf("thread-id=%i, segment=%i/%i (%c), segment-progress=%.2f%%, words-processed:%li -- ",
-        targs[i].id,targs[i].activesegment,targs[i].segment_count,targs[i].c_table[targs[i].activesegment + targs[i].segment_from],targs[i].p_status,targs[i].p_processed);
-      
-      if (targs[i].stop == true && targs[i].password != NULL) thread_continue = false; //If password is found, stop threads
+      printf("thread-id=%i, segment=%i/%i, segment-progress=%.2f%%, words-processed:%li -- ",
+        targs[i].id,targs[i].activesegment,targs[i].segment_count,targs[i].p_status,targs[i].p_processed);
+      if (targs[i].stop == true) thread_continue = false;
     }
-    if(all_threads_dead == true) thread_continue = false; //If no more threads are running, break out of progress view
     printf("\n");
   }
 
