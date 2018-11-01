@@ -6,7 +6,7 @@
  * make
 
 # Run
- ./bruceforcer -h '<hash with salt>'
+ ./bruceforcer -h 'hash with salt'
 
 #optional parameters
   -s -> skip directory
