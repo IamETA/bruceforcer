@@ -1,7 +1,7 @@
 #ifndef FUNCTIONS_H_ /* Include guard */
 #define FUNCTIONS_H_
 //Declerations
-#define ALPHABET "abcdefghikjlmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
+#define ALPHABET "abcdefghikjlmnopqrstuvwxyz"//ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
 //Bruceforce operations
 typedef struct dict_args
 {
@@ -30,7 +30,7 @@ typedef struct bruteforce_args
   long p_processed;
   char *password;
   bool stop;
-  int activesegment;
+  int depth;
 } bruteforce_args;
 
 const char* bf_dictionary(char ***dictionary,int segment_from, int segment_count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort);

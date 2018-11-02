@@ -8,7 +8,7 @@ void* bruteforceThreadCallback(void* args) {
   bruteforce_args *context = args;
   printf("thread-id: %i, thread-start-from: %i, count: %i,bitsize: %i\n",context->id,context->segment_from,context->segment_count,context->c_tablesize);
   char *bf_result = bf_hack(args);
-  printf("Bruteforce Thread %i exiting. ",context->id);
+  printf("Bruteforce Thread %i exiting. total-words: %li ",context->id,context->p_processed);
   context->stop = true;
   context->password = bf_result;
   if (bf_result==NULL) {

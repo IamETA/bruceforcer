@@ -1,10 +1,15 @@
-#include <ctype.h>
+#include <unistd.h>
+int getopt(int argc, char * const argv[],
+           const char *optstring);
+
+extern char *optarg;
+extern int optind, opterr, optopt;
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <crypt.h>
+#include <ctype.h>
 #include <sys/time.h>
 #include "include/main.h"
 #include "include/crypto.h"
@@ -27,10 +32,10 @@ void printlogo() {
   printf("***         01.11.2018         *** \n");
   printf("********************************** \n");
 }
+
 int main(int argc, char *argv[])
 {
   printlogo();
-
   int byteSize = 4;
   int threadCount = 4;
   int skipdictionary = 0;
@@ -65,23 +70,21 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
       }
 
-  if (argc < 2) {
+  if (argc < 3) {
     printhelp();
     exit(EXIT_FAILURE);
   }
   printf("\n");
-/*
-  for (int index = optind; index < argc; index++)
-    printf ("Non-option argument %s\n", argv[index]);
-*/
 
   //Exctract type and salt from hash
   char *salt = malloc(HASH_SALT_SIZE+1);
   salt[HASH_SALT_SIZE] = '\0';
   strncpy(salt, hash, HASH_SALT_SIZE);
   printf("hash: %s, salt: %s, threads:%i, max-byte-size: %i\n", hash, salt,threadCount,byteSize);
+  
   if (skipdictionary==0)
     bruceforce_dictionary(dictpath,hash,salt,threadCount);
+
   bruceforce_bruteforce(hash,salt,byteSize,threadCount);
 
   printf("Complete\n.");

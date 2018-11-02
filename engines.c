@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "include/functions.h"
 #include "include/threads.h"
 
@@ -98,7 +99,10 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     targs[i].c_tablesize = charactertablesize;
     targs[i].hash = hash;
     targs[i].salt = salt;
+    //We need some preinit, or the program will
+    //crash during posting the statuses
     targs[i].p_processed = 0;
+    targs[i].depth = 0;
     targs[i].p_status = 0;
     targs[i].segment_from = -(charactertablesize / THREADS) + ((charactertablesize / THREADS) * (i+1));
     targs[i].segment_count = charactertablesize/THREADS;
@@ -119,10 +123,16 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     bool all_threads_dead = true;
     for (int i=0;i<THREADS;i++) {
       all_threads_dead = all_threads_dead & targs[i].stop; //if any thread is dead
+      //Calculate the progress
+      float a = (float)targs[i].segment_count / targs[i].c_tablesize;
+      int d = a * pow(targs[i].c_tablesize+1,targs[i].depth+1);
       if (targs[i].stop == false) //Print only threads that is running
-        printf("thread-id=%i, segment=%i/%i (%c), segment-progress=%.2f%%, words-processed:%li -- ",
-        targs[i].id,targs[i].activesegment,targs[i].segment_count,targs[i].c_table[targs[i].activesegment + targs[i].segment_from],targs[i].p_status,targs[i].p_processed);
-      
+        printf("bf-thread-id=%i, depth=%i, progress:%.2f, count=%li -- ",
+        targs[i].id,
+        targs[i].depth+1,
+        ((float)targs[i].p_processed / d * 100),
+        targs[i].p_processed);
+        
       if (targs[i].stop == true && targs[i].password != NULL) thread_continue = false; //If password is found, stop threads
     }
     if(all_threads_dead == true) thread_continue = false; //If no more threads are running, break out of progress view

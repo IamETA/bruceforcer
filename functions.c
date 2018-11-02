@@ -8,15 +8,18 @@
 #include <dirent.h>
 #include <string.h>
 #include <crypt.h>
+#include "include/crypto.h"
 #include "include/functions.h"
+
+extern char *strdup(const char *src);
 
 //Bruceforce operations
 void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count);
-char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash, char* password);
+char *password_for_hash(clyps *cdata,const char *salt, const char *hash, char* password);
 const char *bf_dictionary(char ***dictionary, int startfrom, int count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
 {
   // Crypto Init
-  struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
+  clyps *cdata = malloc(sizeof(clyps));
   //struct crypt_data cdata;
   cdata->initialized = 0;
   for (int i = startfrom; i < startfrom + count; i++)
@@ -43,15 +46,15 @@ const char *bf_dictionary(char ***dictionary, int startfrom, int count, const ch
   Improvements: We can probably optimize the string compare 
   function to increase the speed
 */
-char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *hash,char* password) {
-  //printf("%s ", password);
+char *password_for_hash(clyps *cdata,const char *salt, const char *hash,char* password) {
   char* hashcompare = crypt_r(password,salt,cdata);
-  if (strcmp(hashcompare,hash) == 0) {
-    return password;
+  if (hashcompare == NULL) {
+    printf("Critical error Cannot compute hash!!\n");
+    printf("hash: %s, salt: %s, password: %s\n",hash,salt,password);
+    exit(EXIT_FAILURE);
   }
-  else {
-    return NULL;
-  }
+  else if (strcmp(hashcompare,hash) == 0) return password;
+  return NULL;
 }
 /* This is the function that will enumerate all
   possible characters in a given c_tablesize.
@@ -61,28 +64,30 @@ char *password_for_hash(struct crypt_data *cdata,const char *salt, const char *h
   This was the hardest function to make, and theres plenty of 
   optimizations to make
 */
-char* bytesmoker(bruteforce_args *bargs,char* sz_word, int wordsize,int workingposition,struct crypt_data *cdata) {
-  for (int i = 0;i<bargs->c_tablesize;i++) {
-    if (bargs->stop) return NULL;
-    // feedback , for best optimization, remove this (if run with no output fex)
-    if (workingposition == 1) bargs->p_status = ((float)((float)i/(float)bargs->c_tablesize))*100;
+char* bytesmoker(bruteforce_args *bargs,char* sz_word, int wordsize,int workingposition,clyps *cdata) {
+  // if deepest
+  //  sz_word[workingposition] = bargs->c_table[0];
+
+  //bargs->p_status = ((float)(bargs->p_processed) / (pow(bargs->c_tablesize+1,wordsize+1)/bargs->th)) * 100;
+  for (int i = 0;i<bargs->c_tablesize+1;i++) {
 
     //Go deeper if possible
-    if (workingposition < wordsize) {
-      //printf("wordsize:%i",wordsize);
+    if (workingposition < wordsize && (sz_word[workingposition+1] != bargs->c_table[bargs->c_tablesize-1])) {
       char* password = bytesmoker(bargs,sz_word,wordsize,workingposition+1,cdata);
       if (password != NULL) return password;
+      sz_word[workingposition+1] = bargs->c_table[0];
     }
 
+    if (bargs->stop) return NULL;
     //Change the character
     sz_word[workingposition] = bargs->c_table[i];
-
+  
     //Test the password
-    bargs->p_processed++; //Show number of processed words
     if (password_for_hash(cdata,bargs->salt,bargs->hash,sz_word) != NULL) 
       return sz_word;
-  }
 
+    bargs->p_processed++; //Show number of processed words
+  }
   return NULL;
 }
 
@@ -91,31 +96,36 @@ char *bf_hack(bruteforce_args *args)
 {
   // Crypto Init
   char *return_password;
-  struct crypt_data *cdata = malloc(sizeof(struct crypt_data));
+  clyps *cdata = malloc(sizeof(clyps));
   cdata->initialized = 0;
   
   char *sz_word = malloc(sizeof(char*)); //Allocate buffer
-  for (int segment = args->segment_from;segment<args->segment_from + args->segment_count;segment++) {
-    //Start with the first character in c_table
-    //"statically" assign first bit with segment (each thread will have different segments)
-    sz_word[0] = args->c_table[segment]; //As multithread, we only process a segment of the total c_tablesize
-    for (int wordsize=1;wordsize<args->wordsize;wordsize++) {
+  //Incease bitsize incrementally as we try passwords
+
+  for (int wordsize=1;wordsize<args->wordsize;wordsize++) {
+    args->p_processed = 0;
+    sz_word = realloc(sz_word,sizeof(char*) * (wordsize+1));
+    for(int i=0;i<wordsize;i++)  {
+      sz_word[i] = args->c_table[0];
+    }
+    sz_word[wordsize+1] = '\0';
+    for (int segment = args->segment_from;segment<args->segment_from + args->segment_count;segment++) {
+      //Start with the first character in c_table
+      //"statically" assign first bit with segment (each thread will have different segments)
+      sz_word[0] = args->c_table[segment]; //As multithread, we only process a segment of the total c_tablesize
       if (args->stop) {
         //REMEMBER TO FREE MEMORY here
         return NULL;
       }
-      sz_word = realloc(sz_word,sizeof(char*) * wordsize);
-      //sz_word[wordsize]=args->c_table[0];
       sz_word[wordsize+1]='\0';
       //Process each column
       int charpos = 1;
+
+      args->depth = wordsize;
       return_password = bytesmoker(args, sz_word, wordsize, charpos, cdata);
-      
       //Remember to free up memory if needed here
       if(return_password!=NULL) return return_password;
     }
-    args->activesegment = segment - args->segment_from;
-    args->p_status = ((float)(segment - args->segment_from) / args->segment_count) * 100;
   }
   return NULL;
 }
