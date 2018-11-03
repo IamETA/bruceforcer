@@ -3,8 +3,8 @@ CC = gcc
 
 #Flags
 CFLAGS = -g -Wall -Wextra
-DFLAGS = -O0
-RFLAGS = -O0
+DFLAGS = -O3
+RFLAGS = -O3
 
 #OBJ folder
 OBJDIR = obj

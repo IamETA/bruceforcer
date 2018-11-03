@@ -63,9 +63,11 @@ char* bytesmoker(bruteforce_args *bargs,char* sz_word, int wordsize,int workingp
     sz_word[workingposition] = bargs->c_table[i];
   
     //Test the password
-    if (password_for_hash(cdata,bargs->salt,bargs->hash,sz_word) != NULL) 
+    char *s;
+    if ((s = password_for_hash(cdata,bargs->salt,bargs->hash,sz_word)) != NULL) {
+      free(s);
       return sz_word;
-
+    }
     bargs->p_processed++; //Show number of processed words
   }
   return NULL;
@@ -116,7 +118,7 @@ char *bf_hack(bruteforce_args *args)
   return NULL;
 }
 //Dictionary
-const char *bf_dictionary(const char **dictionary, int startfrom, int count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
+const char *bf_dictionary(char **dictionary, int startfrom, int count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
 {
   // Crypto Init
   clyps *cdata = malloc(sizeof(clyps));
@@ -126,8 +128,11 @@ const char *bf_dictionary(const char **dictionary, int startfrom, int count, con
   {
     if (*abort == true)
       break;
-    if (password_for_hash(cdata,p_type_salt,hashedvalue,dictionary[i]) != NULL) {
+
+    char * s;
+    if ((s = password_for_hash(cdata,p_type_salt,hashedvalue,dictionary[i])) != NULL) {
       free(cdata);
+      free(s);
       return dictionary[i];
     }
     *p_status = ((float)(i - startfrom) / count) * 100;
@@ -152,7 +157,6 @@ void load_dictionary(const char *dictionarypath, char ***dictionary, int *count,
     if (epdf->d_name[0] != '.') {
       char *dictionaryfilepath = concat(dictionarypath, epdf->d_name);
       load_dictionary_item(dictionaryfilepath, dictionary, count);
-      printf("\%s",(*dictionary)[0]);
       (*dictfilecount)++;
       free(dictionaryfilepath);
     }
@@ -183,13 +187,13 @@ void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *c
     //
     if (chard == '\n' && wordsize > 0)
     {
+      if (words % 1000 == 0) {
+        dictref = realloc(dictref, sizeof(char *) * (words+1000)); //add a couple of extra to increase speed
+      }
       //null terminate buffer
       buffer[wordsize] = '\0';
       //realoc size of dictionary
-      dictref = realloc(dictref, sizeof(char *) * (words+1));
       if (dictref == NULL) exit(EXIT_FAILURE);
-      dictref[words] = malloc(sizeof(char*)*(wordsize+1));
-      //(*dictionary)[words++] = malloc(wordsize + 1);
       dictref[words] = strdup(buffer);//strncpy(dictref[words], buffer, wordsize-1);
       words++;
       wordsize = 0;

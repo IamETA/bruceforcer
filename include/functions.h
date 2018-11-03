@@ -1,13 +1,13 @@
 #ifndef FUNCTIONS_H_ /* Include guard */
 #define FUNCTIONS_H_
-//Declerations
-#define ALPHABET "abcdefghikjlmnopqrstuvwxyz"//ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
+
+#define ALPHABET "abcdefghikjlmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890+\\\"#&/()=?!@$|][{}<>.,-"
 //Bruceforce operations
 typedef struct dict_args
 {
   int id;
   int segment_count;
-  const char **dictionary;
+  char **dictionary;
   const char *salt;
   const char *hash;
   int segment_from;
@@ -34,7 +34,7 @@ typedef struct bruteforce_args
   int depth;
 } bruteforce_args;
 
-const char* bf_dictionary(const char **dictionary,int segment_from, int segment_count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort);
+const char* bf_dictionary(char **dictionary,int segment_from, int segment_count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort);
 char *bf_hack(bruteforce_args *args);
 void load_dictionary(const char *dictionaryfile, char ***dictionary,int *segment_count,int *dictfilecount);
 //File operations

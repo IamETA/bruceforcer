@@ -22,6 +22,7 @@
   
   -d <directorypath/>
 	Change directory
+
 # How to works
  Bruceforcer will start searching in the directory folder,
 if no password is found, it will continue to the bruteforce part.
@@ -30,3 +31,6 @@ if no password is found, it will continue to the bruteforce part.
 longer passwords after the function has tried every combination possible.
 
  use -n <N> to override the start position of the iterator. everything above 7 takes extremely long time, good luck :)
+
+# Modifications
+ Match ALPHABET: functions.h

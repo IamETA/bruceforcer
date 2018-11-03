@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
+#include <sys/time.h>
 #include "include/functions.h"
 #include "include/threads.h"
 
@@ -14,8 +14,13 @@
  Main bruceforce functions
 */
 
-dict_args **dictcreate_threadargs(int THREADS,char *salt, const char* hash, int words,char***dictionary) {
-  dict_args **threadargs = malloc(sizeof(dict_args*) * (THREADS+1));
+unsigned int timeDifference(struct timeval *before, struct timeval *after)
+{
+  return ((after->tv_sec * 1000000 + after->tv_usec) - (before->tv_sec * 1000000 + before->tv_usec));
+}
+
+dict_args **dictcreate_threadargs(int THREADS,char *salt, const char* hash, int words,char**dictionary) {
+  dict_args **threadargs = malloc(sizeof(dict_args*) * (THREADS));
   for (int i = 0; i < THREADS; i++)
   {
     threadargs[i]=malloc(sizeof(dict_args));
@@ -41,7 +46,7 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
   printf("Loading dictionary from %s\n", dictpath);
   int words = 0;
   char **dictionary = malloc(sizeof(char**));
-  load_dictionary(dictpath, dictionary, &words,&dictfilecount);
+  load_dictionary(dictpath, &dictionary, &words,&dictfilecount);
   
   printf("dictionary-word-count=%d, total-files=%d\n", words, dictfilecount);
   //create thread arguments and start threads
@@ -73,6 +78,7 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
     if (threadargs[i]->password != NULL) {
       printf("Thread %i found the password: %s\n",threadargs[i]->id,threadargs[i]->password);
     }
+    free(threadargs[i]);
   }
   for(int i=0;i<words;i++) {
     free(dictionary[i]);
@@ -84,9 +90,9 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
 void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREADS, int startNum) {
   printf(" *** Stating bruteforce...");
   //Start timer
-  clock_t start,end;
-  double cpu_time;
-  start = clock();
+  struct timeval start,end;
+  int cpu_time;
+  gettimeofday(&start, NULL);
   //all possible characters we'll test
   const char *charactertable = ALPHABET;
   int charactertablesize = strlen(charactertable);
@@ -130,9 +136,9 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
   while (thread_continue) {
     sleep(1);
     //Show time elapsed
-    end = clock();
-    cpu_time = ((double) end - start) / CLOCKS_PER_SEC;
-    printf("Time elapsed: %.0f sec -- ",cpu_time);
+    gettimeofday(&end,NULL);
+    cpu_time = ((float)timeDifference(&start,&end) / 1000000);
+    printf("Time elapsed: %i sec -- ",cpu_time);
     
     //Check flag to stay in loop
     bool all_threads_dead = true;
@@ -143,7 +149,7 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
       float a = (float)targs[i].segment_count / targs[i].c_tablesize;
       long d = a * pow(targs[i].c_tablesize+1,targs[i].depth+1);
       if (targs[i].stop == false) //Print only threads that is running
-        printf("pid=%i, depth=%i, progress:%.5f, count=%li -- ",
+        printf("pid=%i, depth=%i, progress:%.5f%%, count=%li -- ",
         targs[i].id,
         targs[i].depth+1,
         ((float)targs[i].p_processed / d * 100),
