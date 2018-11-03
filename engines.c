@@ -1,4 +1,3 @@
-//#include <stdio.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -6,9 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 #include "include/functions.h"
 #include "include/threads.h"
 
+/*
+	ENGINES
+ Main bruceforce functions
+*/
 
 dict_args **dictcreate_threadargs(int THREADS,char *salt, const char* hash, int words,char***dictionary) {
   dict_args **threadargs = malloc(sizeof(dict_args*) * (THREADS+1));
@@ -36,12 +40,12 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
   int dictfilecount = 0;
   printf("Loading dictionary from %s\n", dictpath);
   int words = 0;
-  char **dictionary = NULL;
-  load_dictionary(dictpath, &dictionary, &words,&dictfilecount);
+  char **dictionary = malloc(sizeof(char**));
+  load_dictionary(dictpath, dictionary, &words,&dictfilecount);
   
   printf("dictionary-word-count=%d, total-files=%d\n", words, dictfilecount);
   //create thread arguments and start threads
-  dict_args **threadargs = dictcreate_threadargs(THREADS,salt,hash,words,&dictionary);
+  dict_args **threadargs = dictcreate_threadargs(THREADS,salt,hash,words,dictionary);
   pthread_t threads[THREADS-1];
   for (int i = 0; i < THREADS; i++)
   {
@@ -74,10 +78,15 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
     free(dictionary[i]);
   }
   free(dictionary);
-
+  free(threadargs);
 }
 
-void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREADS) {
+void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREADS, int startNum) {
+  printf(" *** Stating bruteforce...");
+  //Start timer
+  clock_t start,end;
+  double cpu_time;
+  start = clock();
   //all possible characters we'll test
   const char *charactertable = ALPHABET;
   int charactertablesize = strlen(charactertable);
@@ -91,14 +100,14 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
   bruteforce_args *targs = malloc(sizeof(bruteforce_args)*(THREADS+1));
   pthread_t *threads = malloc(sizeof(pthread_t)*(THREADS+1));
   for(int i=0;i<THREADS;i++){
-    //targs[i] = malloc(sizeof(bruteforce_args));
-    targs[i].password = malloc(sizeof(char*));
+    targs[i].password = NULL;//malloc(sizeof(char*));
     targs[i].id = i;
     targs[i].wordsize = size;
     targs[i].c_table = charactertable;
     targs[i].c_tablesize = charactertablesize;
     targs[i].hash = hash;
     targs[i].salt = salt;
+    targs[i].startNum = startNum;
     //We need some preinit, or the program will
     //crash during posting the statuses
     targs[i].p_processed = 0;
@@ -112,27 +121,34 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     if (i == (THREADS-1)) {
       targs[i].segment_count += charactertablesize % (charactertablesize / THREADS);
     }
-    
+
     pthread_create(&threads[i],NULL,bruteforceThreadCallback,&targs[i]);
   }
-  
+
   //Wait until complete but show progress
   bool thread_continue = true;
   while (thread_continue) {
     sleep(1);
+    //Show time elapsed
+    end = clock();
+    cpu_time = ((double) end - start) / CLOCKS_PER_SEC;
+    printf("Time elapsed: %.0f sec -- ",cpu_time);
+    
+    //Check flag to stay in loop
     bool all_threads_dead = true;
+
     for (int i=0;i<THREADS;i++) {
       all_threads_dead = all_threads_dead & targs[i].stop; //if any thread is dead
       //Calculate the progress
       float a = (float)targs[i].segment_count / targs[i].c_tablesize;
-      int d = a * pow(targs[i].c_tablesize+1,targs[i].depth+1);
+      long d = a * pow(targs[i].c_tablesize+1,targs[i].depth+1);
       if (targs[i].stop == false) //Print only threads that is running
-        printf("bf-thread-id=%i, depth=%i, progress:%.2f, count=%li -- ",
+        printf("pid=%i, depth=%i, progress:%.5f, count=%li -- ",
         targs[i].id,
         targs[i].depth+1,
         ((float)targs[i].p_processed / d * 100),
         targs[i].p_processed);
-        
+ 
       if (targs[i].stop == true && targs[i].password != NULL) thread_continue = false; //If password is found, stop threads
     }
     if(all_threads_dead == true) thread_continue = false; //If no more threads are running, break out of progress view
@@ -148,6 +164,9 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
   for (int i=0;i<THREADS;i++) {
     if (targs[i].password != NULL) {
       printf("Thread %i found the password: %s\n",targs[i].id,targs[i].password);
+      free(targs[i].password);
     }
   }
+  free(threads);
+  free(targs);
 }

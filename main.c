@@ -22,8 +22,9 @@ extern int optind, opterr, optopt;
 
 
 void printhelp() {
-  printf("Syntax: bruceforce -h '<hash>' -d '<optional dictionarypath>' -t <number of threads> -b <size of bytes>\n");
-  printf("Extra flags: `-s` to skip directory check.\n\n");
+  printf("Syntax: bruceforce -h '<hash>' -d '<optional dictionarypath>' -t <number of threads> -s <size of bytes>\n");
+  printf("Extra flags: `-b` to skip directory check.\n");
+  printf("	`-n N` start on wordlength\n");
 }
 void printlogo() {
   printf("********************************** \n");
@@ -32,48 +33,61 @@ void printlogo() {
   printf("***         01.11.2018         *** \n");
   printf("********************************** \n");
 }
-
+clyps *cdata;
 int main(int argc, char *argv[])
 {
   printlogo();
-  int byteSize = 4;
+  //initialize global cryptodata  
+  
+  int byteSize = 8;
   int threadCount = 4;
   int skipdictionary = 0;
-  const char *hash;
+  int startNum = 2; //2 Minimum
+  const char *hash = NULL;
   const char *dictpath = DEFAULT_DICTIONARY_PATH;
   int c;
-  while ((c = getopt (argc, argv, "htdsb")) != -1)
+  while ((c = getopt (argc, argv, "htdsbn")) != -1)
     switch (c)
       {
       case 't':
-	      printf("set-threads:%s ",argv[optind]);
+	printf("set-threads:%s ",argv[optind]);
         threadCount = atoi(argv[optind]);
         break;
       case 'h':
         printf("set-hash:%s ",argv[optind]);
         hash = argv[optind];
-        break; 
+        break;
       case 'd':
         printf("set-directory:%s ", argv[optind]);
         dictpath = argv[optind];
         break;
-      case 's':
+      case 'b':
         printf("skip-dictionary ");
         skipdictionary = 1;
         break;
-      case 'b':
+      case 's':
         printf("set-max-bytes: %s ",argv[optind]);
         byteSize = atoi(argv[optind]);
         break;
+      case 'n':
+	printf("start-on: %s", argv[optind]);
+	startNum = atoi(argv[optind]);
+      	break;
       default:
         printhelp();
         exit(EXIT_FAILURE);
       }
 
+  //Validation
   if (argc < 3) {
     printhelp();
     exit(EXIT_FAILURE);
   }
+  if (hash == NULL) {
+    printhelp();
+    hash = argv[optind]; //The did not input -h parameter, take a chance :)
+  }
+  if (startNum < 2) { startNum = 2; }
   printf("\n");
 
   //Exctract type and salt from hash
@@ -81,11 +95,14 @@ int main(int argc, char *argv[])
   salt[HASH_SALT_SIZE] = '\0';
   strncpy(salt, hash, HASH_SALT_SIZE);
   printf("hash: %s, salt: %s, threads:%i, max-byte-size: %i\n", hash, salt,threadCount,byteSize);
-  
-  if (skipdictionary==0)
-    bruceforce_dictionary(dictpath,hash,salt,threadCount);
 
-  bruceforce_bruteforce(hash,salt,byteSize,threadCount);
+  if (skipdictionary==0) {
+    bruceforce_dictionary(dictpath,hash,salt,threadCount);
+    printf("Press ANY key to continue");
+    getchar();
+  }
+
+  bruceforce_bruteforce(hash,salt,byteSize,threadCount,startNum);
 
   printf("Complete\n.");
   free(salt);

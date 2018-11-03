@@ -1,4 +1,3 @@
-//
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -15,26 +14,7 @@ extern char *strdup(const char *src);
 
 //Bruceforce operations
 void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count);
-char *password_for_hash(clyps *cdata,const char *salt, const char *hash, char* password);
-const char *bf_dictionary(char ***dictionary, int startfrom, int count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
-{
-  // Crypto Init
-  clyps *cdata = malloc(sizeof(clyps));
-  //struct crypt_data cdata;
-  cdata->initialized = 0;
-  for (int i = startfrom; i < startfrom + count; i++)
-  {
-    if (*abort == true)
-      break;
-    
-    if (password_for_hash(cdata,p_type_salt,hashedvalue,(*dictionary)[i]) != NULL) {
-      return (*dictionary)[i];
-    }
-    *p_status = ((float)(i - startfrom) / count) * 100;
-  }
-  return '\0';
-}
-
+char *password_for_hash(clyps *cdata,const char *salt, const char *hash, const char* password);
 /* 
   Check password to hash function to see if the
   hashed result is equal to the input of <hash>
@@ -46,14 +26,14 @@ const char *bf_dictionary(char ***dictionary, int startfrom, int count, const ch
   Improvements: We can probably optimize the string compare 
   function to increase the speed
 */
-char *password_for_hash(clyps *cdata,const char *salt, const char *hash,char* password) {
+char *password_for_hash(clyps *cdata,const char *salt, const char *hash,const char* password) {
   char* hashcompare = crypt_r(password,salt,cdata);
   if (hashcompare == NULL) {
     printf("Critical error Cannot compute hash!!\n");
     printf("hash: %s, salt: %s, password: %s\n",hash,salt,password);
     exit(EXIT_FAILURE);
   }
-  else if (strcmp(hashcompare,hash) == 0) return password;
+  else if (strcmp(hashcompare,hash) == 0) return strdup(password);
   return NULL;
 }
 /* This is the function that will enumerate all
@@ -95,14 +75,13 @@ char* bytesmoker(bruteforce_args *bargs,char* sz_word, int wordsize,int workingp
 char *bf_hack(bruteforce_args *args)
 {
   // Crypto Init
-  char *return_password;
   clyps *cdata = malloc(sizeof(clyps));
   cdata->initialized = 0;
-  
+  char *return_password;
   char *sz_word = malloc(sizeof(char*)); //Allocate buffer
   //Incease bitsize incrementally as we try passwords
 
-  for (int wordsize=1;wordsize<args->wordsize;wordsize++) {
+  for (int wordsize=1+(args->startNum-2);wordsize<args->wordsize;wordsize++) {
     args->p_processed = 0;
     sz_word = realloc(sz_word,sizeof(char*) * (wordsize+1));
     for(int i=0;i<wordsize;i++)  {
@@ -114,8 +93,9 @@ char *bf_hack(bruteforce_args *args)
       //"statically" assign first bit with segment (each thread will have different segments)
       sz_word[0] = args->c_table[segment]; //As multithread, we only process a segment of the total c_tablesize
       if (args->stop) {
-        //REMEMBER TO FREE MEMORY here
-        return NULL;
+        free(cdata);
+	free(sz_word);
+	return NULL;
       }
       sz_word[wordsize+1]='\0';
       //Process each column
@@ -124,12 +104,38 @@ char *bf_hack(bruteforce_args *args)
       args->depth = wordsize;
       return_password = bytesmoker(args, sz_word, wordsize, charpos, cdata);
       //Remember to free up memory if needed here
-      if(return_password!=NULL) return return_password;
+     
+      if(return_password!=NULL) {
+	free(cdata);
+	return return_password;
+      }
     }
   }
+  free(cdata);
+  free(sz_word);
   return NULL;
 }
 //Dictionary
+const char *bf_dictionary(const char **dictionary, int startfrom, int count, const char *p_type_salt, const char *hashedvalue, float *p_status, bool *abort)
+{
+  // Crypto Init
+  clyps *cdata = malloc(sizeof(clyps));
+  //struct crypt_data cdata;
+  cdata->initialized = 0;
+  for (int i = startfrom; i < startfrom + count; i++)
+  {
+    if (*abort == true)
+      break;
+    if (password_for_hash(cdata,p_type_salt,hashedvalue,dictionary[i]) != NULL) {
+      free(cdata);
+      return dictionary[i];
+    }
+    *p_status = ((float)(i - startfrom) / count) * 100;
+  }
+  free(cdata);
+  return '\0';
+}
+
 void load_dictionary(const char *dictionarypath, char ***dictionary, int *count, int *dictfilecount)
 {
   (*dictfilecount) = 0;
@@ -146,6 +152,7 @@ void load_dictionary(const char *dictionarypath, char ***dictionary, int *count,
     if (epdf->d_name[0] != '.') {
       char *dictionaryfilepath = concat(dictionarypath, epdf->d_name);
       load_dictionary_item(dictionaryfilepath, dictionary, count);
+      printf("\%s",(*dictionary)[0]);
       (*dictfilecount)++;
       free(dictionaryfilepath);
     }
@@ -155,10 +162,10 @@ void load_dictionary(const char *dictionarypath, char ***dictionary, int *count,
 
 void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *count)
 {
-
+  char **dictref = (*dictionary);
   FILE *fp = fopen(dictionaryfile, "r");
   //size_t len = 0;
-  char *buffer = malloc(sizeof(char) * 30);
+  char *buffer = malloc(sizeof(char) * 100);
 
   if (fp == NULL)
     exit(EXIT_FAILURE);
@@ -173,14 +180,18 @@ void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *c
   while (chard != EOF)
   {
     //Add to buffer;
-    if (chard == '\n')
+    //
+    if (chard == '\n' && wordsize > 0)
     {
       //null terminate buffer
       buffer[wordsize] = '\0';
       //realoc size of dictionary
-      *dictionary = realloc(*dictionary, sizeof(char *) * (words + 1));
-      (*dictionary)[words++] = malloc(wordsize + 1);
-      strncpy((*dictionary)[words - 1], buffer, wordsize + 1);
+      dictref = realloc(dictref, sizeof(char *) * (words+1));
+      if (dictref == NULL) exit(EXIT_FAILURE);
+      dictref[words] = malloc(sizeof(char*)*(wordsize+1));
+      //(*dictionary)[words++] = malloc(wordsize + 1);
+      dictref[words] = strdup(buffer);//strncpy(dictref[words], buffer, wordsize-1);
+      words++;
       wordsize = 0;
     }
     else
@@ -192,6 +203,7 @@ void load_dictionary_item(const char *dictionaryfile, char ***dictionary, int *c
     chard = fgetc(fp);
   }
   (*count) = words;
+  (*dictionary) = dictref;
   free(buffer);
   fclose(fp);
 }
