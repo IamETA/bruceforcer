@@ -88,13 +88,15 @@ void bruceforce_dictionary(const char *dictpath, const char *hash, char *salt, i
 }
 
 void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREADS, int startNum) {
-  printf(" *** Stating bruteforce...");
-  //Start timer
+  printf(" *** Starting bruteforce...\n");
+  //progress/timer definitions
   struct timeval start,end;
-  int cpu_time;
+  int p_time, p_wpm;
   gettimeofday(&start, NULL);
-  //all possible characters we'll test
+  
+  //define the possible characters we'll test
   const char *charactertable = ALPHABET;
+
   int charactertablesize = strlen(charactertable);
   printf("password-table-size: %i\n",charactertablesize);
 
@@ -105,6 +107,7 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     */
   bruteforce_args *targs = malloc(sizeof(bruteforce_args)*(THREADS+1));
   pthread_t *threads = malloc(sizeof(pthread_t)*(THREADS+1));
+  
   for(int i=0;i<THREADS;i++){
     targs[i].password = NULL;//malloc(sizeof(char*));
     targs[i].id = i;
@@ -114,6 +117,7 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     targs[i].hash = hash;
     targs[i].salt = salt;
     targs[i].startNum = startNum;
+
     //We need some preinit, or the program will
     //crash during posting the statuses
     targs[i].p_processed = 0;
@@ -133,23 +137,35 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
 
   //Wait until complete but show progress
   bool thread_continue = true;
+  long total_words = 0;
+  long last_totalwords = 0;
+  struct timeval time_last;
   while (thread_continue) {
-    sleep(1);
-    //Show time elapsed
+    sleep(1.5);
+    //print time elapsed & ppm (actual numbers)
     gettimeofday(&end,NULL);
-    cpu_time = ((float)timeDifference(&start,&end) / 1000000);
-    printf("Time elapsed: %i sec -- ",cpu_time);
+    p_time = ((float)timeDifference(&start,&end) / 1000000);
+    double time_last_diff = timeDifference(&time_last,&end);
+    p_wpm = ((total_words - last_totalwords)*60) / 1000 / (time_last_diff/1000000);
+    last_totalwords = total_words;
+    time_last = end;
+
+    printf("time: %i sec wpm: %ik -- ",p_time, p_wpm);
     
     //Check flag to stay in loop
     bool all_threads_dead = true;
-
+    total_words = 0;
+    
     for (int i=0;i<THREADS;i++) {
+      total_words += targs[i].p_processed;
       all_threads_dead = all_threads_dead & targs[i].stop; //if any thread is dead
+      
       //Calculate the progress
       float a = (float)targs[i].segment_count / targs[i].c_tablesize;
       long d = a * pow(targs[i].c_tablesize+1,targs[i].depth+1);
+      
       if (targs[i].stop == false) //Print only threads that is running
-        printf("pid=%i, depth=%i, progress:%.5f%%, count=%li -- ",
+        printf("[%i>%i:%.5f%% %li] ",
         targs[i].id,
         targs[i].depth+1,
         ((float)targs[i].p_processed / d * 100),
