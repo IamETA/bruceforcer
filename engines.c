@@ -140,6 +140,9 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
   long total_words = 0;
   long last_totalwords = 0;
   struct timeval time_last;
+  //let the threads start
+  sleep(2);
+  printf("[Total time elapsed] [Words per minute] [id wordsize progress count]...\n");
   while (thread_continue) {
     sleep(1.5);
     //print time elapsed & ppm (actual numbers)
@@ -147,6 +150,7 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
     p_time = ((float)timeDifference(&start,&end) / 1000000);
     double time_last_diff = timeDifference(&time_last,&end);
     p_wpm = ((total_words - last_totalwords)*60) / 1000 / (time_last_diff/1000000);
+	if (p_wpm<0)p_wpm=0;
     last_totalwords = total_words;
     time_last = end;
 
@@ -165,11 +169,11 @@ void bruceforce_bruteforce(const char* hash,const char *salt, int size,int THREA
       long d = a * pow(targs[i].c_tablesize+1,targs[i].depth+1);
       
       if (targs[i].stop == false) //Print only threads that is running
-        printf("[%i>%i:%.5f%% %li] ",
+        printf("[%i-b>%i:%.2f%%] ",
         targs[i].id,
         targs[i].depth+1,
-        ((float)targs[i].p_processed / d * 100),
-        targs[i].p_processed);
+        ((float)targs[i].p_processed / d * 100));//,
+        //targs[i].p_processed);
  
       if (targs[i].stop == true && targs[i].password != NULL) thread_continue = false; //If password is found, stop threads
     }
